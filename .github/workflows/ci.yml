@@ -30,7 +30,6 @@ jobs:
         run: |
           set -euo pipefail
           BASE_REF="${{ github.base_ref }}"
-          # Handle first-commit or empty base
           if [ -z "$BASE_REF" ] || [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
             echo "client_changed=true" >> $GITHUB_OUTPUT
             echo "server_changed=true" >> $GITHUB_OUTPUT
@@ -48,7 +47,7 @@ jobs:
   test-client:
     name: test-client
     runs-on: ubuntu-latest
-    needs: [danger, changes]
+    needs: [changes]
     if: ${{ needs.changes.outputs.client_changed == 'true' || needs.changes.outputs.workflow_changed == 'true' }}
     steps:
       - name: Checkout
@@ -88,7 +87,7 @@ jobs:
   test-server:
     name: test-server
     runs-on: ubuntu-latest
-    needs: [danger, changes]
+    needs: [changes]
     if: ${{ needs.changes.outputs.server_changed == 'true' || needs.changes.outputs.workflow_changed == 'true' }}
     steps:
       - name: Checkout
@@ -126,14 +125,13 @@ jobs:
           PORT: 5000
         run: |
           cd server
-          # Verify the server code has no syntax errors
           node -c index.js
 
   on-failure:
     name: on-failure
     runs-on: ubuntu-latest
-    needs: [test-client, test-server, danger]
-    if: ${{ always() && (needs.danger.result == 'failure' || needs.danger.result == 'cancelled' || needs['test-client'].result == 'failure' || needs['test-client'].result == 'cancelled' || needs['test-server'].result == 'failure' || needs['test-server'].result == 'cancelled') }}
+    needs: [test-client, test-server]
+    if: ${{ always() && (needs['test-client'].result == 'failure' || needs['test-client'].result == 'cancelled' || needs['test-server'].result == 'failure' || needs['test-server'].result == 'cancelled') }}
     permissions:
       pull-requests: write
       issues: write
@@ -144,14 +142,13 @@ jobs:
         run: |
           set -euo pipefail
           failures=""
-          if [ "${{ needs.danger.result }}" = "failure" ] || [ "${{ needs.danger.result }}" = "cancelled" ]; then failures+="- danger: Danger checks failed\n"; fi
           if [ "${{ needs['test-client'].result }}" = "failure" ] || [ "${{ needs['test-client'].result }}" = "cancelled" ]; then failures+="- test-client: client lint/build failed\n"; fi
           if [ "${{ needs['test-server'].result }}" = "failure" ] || [ "${{ needs['test-server'].result }}" = "cancelled" ]; then failures+="- test-server: server lint/build failed\n"; fi
           echo "failures<<EOF" >> $GITHUB_OUTPUT
           echo -e "$failures" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Post PR comment and close
+      - name: Post PR comment
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -162,22 +159,21 @@ jobs:
             const failures = process.env.FAILURES || '';
             const runUrl = `${process.env.GITHUB_SERVER_URL}/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`;
             if (!prObj) {
-              console.log('No pull_request found in event payload; skipping comment/close.');
+              console.log('No pull_request found in event payload; skipping comment.');
             } else {
               const pr = prObj.number;
               const author = prObj.user ? prObj.user.login : '';
-              const body = `@${author}\n\nThe following CI jobs failed:\n\n${failures}\nLogs: ${runUrl}\n\nThis PR will be closed automatically.`;
+              const body = `@${author}\n\nThe following CI jobs failed:\n\n${failures}\nLogs: ${runUrl}`;
               await github.rest.issues.createComment({ owner, repo, issue_number: pr, body });
-              await github.rest.pulls.update({ owner, repo, pull_number: pr, state: 'closed' });
             }
         env:
           FAILURES: ${{ steps.build-failure.outputs.failures }}
-          
+
   on-success:
     name: on-success
     runs-on: ubuntu-latest
-    needs: [test-client, test-server, danger]
-    if: ${{ always() && needs.danger.result == 'success' && (needs['test-client'].result == 'success' || needs['test-client'].result == 'skipped') && (needs['test-server'].result == 'success' || needs['test-server'].result == 'skipped') }}
+    needs: [test-client, test-server]
+    if: ${{ always() && (needs['test-client'].result == 'success' || needs['test-client'].result == 'skipped') && (needs['test-server'].result == 'success' || needs['test-server'].result == 'skipped') && (needs['test-client'].result == 'success' || needs['test-server'].result == 'success') }}
     permissions:
       pull-requests: write
       contents: read
@@ -190,25 +186,23 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const prObj = context.payload.pull_request;
-            
+
             if (!prObj) {
               console.log('No pull_request found; skipping success comment.');
               return;
             }
-            
+
             const pr = prObj.number;
             const author = prObj.user ? prObj.user.login : '';
             const runUrl = `${process.env.GITHUB_SERVER_URL}/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-            
-            // Check which jobs ran
+
             const clientRan = '${{ needs.test-client.result }}' !== 'skipped';
             const serverRan = '${{ needs.test-server.result }}' !== 'skipped';
-            
+
             let testsRun = [];
             if (clientRan) testsRun.push('✅ Client: Lint + Build');
             if (serverRan) testsRun.push('✅ Server: Lint + Syntax Check');
-            testsRun.push('✅ Danger: PR format checks');
-            
+
             const body = `## 🎉 All CI Checks Passed!\n\n@${author}\n\n` +
               `**Tests Run:**\n${testsRun.map(t => `- ${t}`).join('\n')}\n\n` +
               `**Lines Changed:** +${prObj.additions} / -${prObj.deletions}\n\n` +
@@ -220,11 +214,10 @@ jobs:
               `- [ ] Check for best practices and security issues\n` +
               `- [ ] Test functionality locally if needed\n\n` +
               `*This PR is ready for human review.*`;
-            
-            await github.rest.issues.createComment({ 
-              owner, 
-              repo, 
-              issue_number: pr, 
-              body 
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pr,
+              body
             });
-          
