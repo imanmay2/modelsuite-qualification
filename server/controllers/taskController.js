@@ -1,5 +1,31 @@
 ﻿const Task = require('../models/Task');
 
+const normalizeString = (value) => (typeof value === 'string' ? value.trim() : '');
+
+const validateTaskPayload = ({ title, description }) => {
+  const errors = [];
+
+  if (!normalizeString(title)) {
+    errors.push('Title is required');
+  }
+
+  if (!normalizeString(description)) {
+    errors.push('Description is required');
+  }
+
+  return errors;
+};
+
+const sendValidationError = (res, error) => {
+  if (error.name !== 'ValidationError') return false;
+
+  res.status(400).json({
+    message: 'Invalid task payload',
+    errors: Object.values(error.errors).map((fieldError) => fieldError.message),
+  });
+  return true;
+};
+
 // @desc  Get all tasks
 // @route GET /api/tasks
 // @access Admin
@@ -39,11 +65,19 @@ const getTaskById = async (req, res) => {
 // @access Admin
 const createTask = async (req, res) => {
   const { title, description, status, assignedTo, dueDate } = req.body;
+  const validationErrors = validateTaskPayload({ title, description });
+
+  if (validationErrors.length) {
+    return res.status(400).json({
+      message: 'Task title and description are required',
+      errors: validationErrors,
+    });
+  }
 
   try {
     const task = await Task.create({
-      title,
-      description,
+      title: normalizeString(title),
+      description: normalizeString(description),
       status,
       assignedTo: assignedTo || null,
       dueDate,
@@ -52,6 +86,7 @@ const createTask = async (req, res) => {
 
     res.status(201).json(task);
   } catch (error) {
+    if (sendValidationError(res, error)) return;
     res.status(500).json({ message: error.message });
   }
 };
@@ -63,15 +98,38 @@ const updateTask = async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    if ('title' in req.body || 'description' in req.body) {
+      const validationErrors = validateTaskPayload({
+        title: 'title' in req.body ? req.body.title : task.title,
+        description:
+          'description' in req.body ? req.body.description : task.description,
+      });
+
+      if (validationErrors.length) {
+        return res.status(400).json({
+          message: 'Task title and description are required',
+          errors: validationErrors,
+        });
+      }
+    }
+
+    const updates = { ...req.body };
+    if ('title' in updates) updates.title = normalizeString(updates.title);
+    if ('description' in updates) {
+      updates.description = normalizeString(updates.description);
+    }
+
     // including internal fields like createdBy or __v
     const updated = await Task.findByIdAndUpdate(
       req.params.id,
-      { ...req.body },
-      { new: true }
+      updates,
+      { new: true, runValidators: true }
     ).populate('assignedTo', 'name email');
 
     res.json(updated);
   } catch (error) {
+    if (sendValidationError(res, error)) return;
     res.status(500).json({ message: error.message });
   }
 };
