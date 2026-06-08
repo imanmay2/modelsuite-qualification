@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Sidebar from '../../components/admin/Sidebar';
 import SubmissionReviewModal from '../../components/admin/SubmissionReviewModal';
 import { fetchAllSubmissions } from '../../api/submissions';
@@ -12,6 +12,7 @@ const REVIEW_STATUS_CLASS = {
 const SubmissionsPage = () => {
   const [submissions, setSubmissions] = useState([]);
   const [reviewTarget, setReviewTarget] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
   const loadSubmissions = async () => {
     try {
@@ -30,6 +31,64 @@ const SubmissionsPage = () => {
 
   const thCls = 'text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.7px] text-text-faint border-b border-border whitespace-nowrap';
   const tdCls = 'px-5 py-4 border-b border-border align-middle';
+
+  const handleSort = (key) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const getSortValue = (submission, key) => {
+    switch (key) {
+      case 'task':
+        return submission.taskId?.title || '';
+      case 'talent':
+        return submission.talentId?.name || '';
+      case 'notes':
+        return submission.notes || '';
+      case 'file':
+        return submission.fileUrl || '';
+      case 'submitted':
+        return submission.createdAt ? new Date(submission.createdAt).getTime() || 0 : 0;
+      case 'reviewStatus':
+        return submission.reviewStatus || 'Pending';
+      default:
+        return '';
+    }
+  };
+
+  const sortedSubmissions = useMemo(() => {
+    if (!sortConfig.key) return submissions;
+
+    return [...submissions].sort((a, b) => {
+      const aValue = getSortValue(a, sortConfig.key);
+      const bValue = getSortValue(b, sortConfig.key);
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+
+      const result = String(aValue).localeCompare(String(bValue), undefined, {
+        sensitivity: 'base',
+      });
+      return sortConfig.direction === 'asc' ? result : -result;
+    });
+  }, [submissions, sortConfig]);
+
+  const renderSortHeader = (label, key) => (
+    <th className={thCls}>
+      <button
+        type="button"
+        onClick={() => handleSort(key)}
+        className="flex items-center gap-1 bg-transparent border-none p-0 text-inherit uppercase tracking-[0.7px] cursor-pointer font-semibold font-sans">
+        <span>{label}</span>
+        {sortConfig.key === key && (
+          <span aria-hidden="true">{sortConfig.direction === 'asc' ? '^' : 'v'}</span>
+        )}
+      </button>
+    </th>
+  );
 
   return (
     <div className="flex min-h-screen bg-bg-dark">
@@ -77,18 +136,18 @@ const SubmissionsPage = () => {
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="bg-bg-surface">
-                    <th className={thCls}>Task</th>
-                    <th className={thCls}>Talent</th>
-                    <th className={thCls}>Notes</th>
-                    <th className={thCls}>File</th>
+                    {renderSortHeader('Task', 'task')}
+                    {renderSortHeader('Talent', 'talent')}
+                    {renderSortHeader('Notes', 'notes')}
+                    {renderSortHeader('File', 'file')}
                     
-                    <th className={thCls}>Submitted</th>
-                    <th className={thCls}>Review Status</th>
+                    {renderSortHeader('Submitted', 'submitted')}
+                    {renderSortHeader('Review Status', 'reviewStatus')}
                     <th className={thCls}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {submissions.map((sub) => (
+                  {sortedSubmissions.map((sub) => (
                     <tr key={sub._id} className="border-b border-border last:border-0 hover:bg-bg-hover transition-colors">
 
                       {/* Task */}

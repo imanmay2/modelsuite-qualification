@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { deleteTask } from '../../api/tasks';
 
 /* ── SVG Action Icons ── */
@@ -42,6 +43,63 @@ const STATUS_CLASS = {
 };
 
 const TasksTable = ({ tasks, onEdit, onRefresh }) => {
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  const handleSort = (key) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const getSortValue = (task, key) => {
+    switch (key) {
+      case 'title':
+        return task.title || '';
+      case 'status':
+        return task.status || '';
+      case 'assignedTo':
+        return task.assignedTo?.name || '';
+      case 'dueDate':
+        return task.dueDate ? new Date(task.dueDate).getTime() || 0 : 0;
+      case 'createdAt':
+        return task.createdAt ? new Date(task.createdAt).getTime() || 0 : 0;
+      default:
+        return '';
+    }
+  };
+
+  const sortedTasks = useMemo(() => {
+    if (!sortConfig.key) return tasks;
+
+    return [...tasks].sort((a, b) => {
+      const aValue = getSortValue(a, sortConfig.key);
+      const bValue = getSortValue(b, sortConfig.key);
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+
+      const result = String(aValue).localeCompare(String(bValue), undefined, {
+        sensitivity: 'base',
+      });
+      return sortConfig.direction === 'asc' ? result : -result;
+    });
+  }, [tasks, sortConfig]);
+
+  const renderSortHeader = (label, key) => (
+    <th className="table-th">
+      <button
+        type="button"
+        onClick={() => handleSort(key)}
+        className="flex items-center gap-1 bg-transparent border-none p-0 text-inherit uppercase tracking-[0.07em] cursor-pointer font-semibold font-sans">
+        <span>{label}</span>
+        {sortConfig.key === key && (
+          <span aria-hidden="true">{sortConfig.direction === 'asc' ? '^' : 'v'}</span>
+        )}
+      </button>
+    </th>
+  );
 
   const handleDelete = async (id) => {
     try {
@@ -70,16 +128,16 @@ const TasksTable = ({ tasks, onEdit, onRefresh }) => {
       <table className="w-full border-collapse" style={{ fontSize: '13.5px' }}>
         <thead>
           <tr>
-            <th className="table-th">Title</th>
-            <th className="table-th">Status</th>
-            <th className="table-th">Assigned To</th>
-            <th className="table-th">Due Date</th>
-            <th className="table-th">Created</th>
+            {renderSortHeader('Title', 'title')}
+            {renderSortHeader('Status', 'status')}
+            {renderSortHeader('Assigned To', 'assignedTo')}
+            {renderSortHeader('Due Date', 'dueDate')}
+            {renderSortHeader('Created', 'createdAt')}
             <th className="table-th">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {tasks.map((task, i) => (
+          {sortedTasks.map((task, i) => (
             <tr key={task._id}
               className="table-row table-row-animate"
               style={{ animationDelay: `${i * 0.05}s` }}>
