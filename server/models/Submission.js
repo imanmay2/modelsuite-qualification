@@ -5,10 +5,17 @@ const submissionSchema = new mongoose.Schema(
     taskId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Task',
+      required: true,
     },
     talentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      required: true,
+    },
+    attemptNumber: {
+      type: Number,
+      required: true,
+      min: 1,
     },
     fileUrl: {
       type: String,
@@ -18,8 +25,8 @@ const submissionSchema = new mongoose.Schema(
     },
     reviewStatus: {
       type: String,
+      enum: ['Pending', 'Approved', 'Rejected'],
       default: 'Pending',
-      // Should be: enum: ['Pending', 'Approved', 'Rejected']
     },
   },
   { timestamps: true }
