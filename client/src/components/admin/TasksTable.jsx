@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { deleteTask } from '../../api/tasks';
+import ConfirmDialog from './ConfirmDialog';
 
 /* ── SVG Action Icons ── */
 const IconEdit = () => (
@@ -44,6 +45,7 @@ const STATUS_CLASS = {
 
 const TasksTable = ({ tasks, onEdit, onRefresh }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [taskToDelete, setTaskToDelete] = useState(null);
 
   const handleSort = (key) => {
     setSortConfig((current) => ({
@@ -101,9 +103,12 @@ const TasksTable = ({ tasks, onEdit, onRefresh }) => {
     </th>
   );
 
-  const handleDelete = async (id) => {
+  const handleDelete = async () => {
+    if (!taskToDelete) return;
+
     try {
-      await deleteTask(id);
+      await deleteTask(taskToDelete._id);
+      setTaskToDelete(null);
       onRefresh();
     } catch {
       alert('Failed to delete task');
@@ -203,7 +208,7 @@ const TasksTable = ({ tasks, onEdit, onRefresh }) => {
                     <IconEdit />
                   </button>
                   <button
-                    onClick={() => handleDelete(task._id)}
+                    onClick={() => setTaskToDelete(task)}
                     title="Delete task"
                     className="action-btn action-btn-delete">
                     <IconDelete />
@@ -214,6 +219,16 @@ const TasksTable = ({ tasks, onEdit, onRefresh }) => {
           ))}
         </tbody>
       </table>
+
+      {taskToDelete && (
+        <ConfirmDialog
+          title="Delete Task?"
+          message={`This will permanently delete "${taskToDelete.title || 'this task'}". This action cannot be undone.`}
+          confirmLabel="Delete"
+          onCancel={() => setTaskToDelete(null)}
+          onConfirm={handleDelete}
+        />
+      )}
     </div>
   );
 };

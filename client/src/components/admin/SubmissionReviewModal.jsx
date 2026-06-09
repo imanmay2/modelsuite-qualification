@@ -1,5 +1,8 @@
 ﻿import { reviewSubmission } from '../../api/submissions';
 
+import { useState } from 'react';
+import ConfirmDialog from './ConfirmDialog';
+
 const REVIEW_STATUS_CLASS = {
   Pending:  'status-badge-Submitted',
   Approved: 'status-badge-Approved',
@@ -7,6 +10,7 @@ const REVIEW_STATUS_CLASS = {
 };
 
 const SubmissionReviewModal = ({ submission, onClose, onReviewed }) => {
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
 
   const handleReview = async (status) => {
     try {
@@ -105,7 +109,7 @@ const SubmissionReviewModal = ({ submission, onClose, onReviewed }) => {
               className="flex-1 py-2.5 bg-bg-input text-text-muted border border-border rounded-lg text-sm font-medium cursor-pointer hover:bg-bg-hover hover:text-text-primary transition-all font-sans">
               Cancel
             </button>
-            <button onClick={() => handleReview('Rejected')}
+            <button onClick={() => setShowRejectConfirm(true)}
               className="flex-1 py-2.5 bg-danger/10 text-danger border border-danger/30 rounded-lg text-sm font-semibold cursor-pointer hover:bg-danger/20 transition-all font-sans">
               ✕ Reject
             </button>
@@ -116,6 +120,16 @@ const SubmissionReviewModal = ({ submission, onClose, onReviewed }) => {
           </div>
         </div>
       </div>
+
+      {showRejectConfirm && (
+        <ConfirmDialog
+          title="Reject Submission?"
+          message={`This will reject the submission for "${task.title || 'this task'}". Please confirm before continuing.`}
+          confirmLabel="Reject"
+          onCancel={() => setShowRejectConfirm(false)}
+          onConfirm={() => handleReview('Rejected')}
+        />
+      )}
     </div>
   );
 };
