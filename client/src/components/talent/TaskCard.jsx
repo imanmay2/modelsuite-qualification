@@ -20,11 +20,11 @@ const TaskCard = ({ task, showClaimButton = false, onClaimed }) => {
   };
 
   return (
-    <div className="bg-bg-card border border-border rounded-xl p-5 flex flex-col gap-3 hover:border-border-light hover:-translate-y-0.5 transition-all cursor-default">
+      <div className="bg-bg-card border border-border rounded-xl p-5 flex flex-col gap-3 hover:border-border-light hover:-translate-y-0.5 transition-all cursor-default overflow-hidden">
 
       {/* Header: title + status */}
-      <div className="flex items-start justify-between gap-2.5">
-        <p className="text-[15px] font-semibold text-text-primary leading-snug">{task.title || 'Untitled Task'}</p>
+      <div className="flex items-start justify-between gap-2.5 min-w-0">
+        <p className="text-[15px] font-semibold text-text-primary leading-snug truncate min-w-0">{task.title || 'Untitled Task'}</p>
         {task.status && (
           <span className={`shrink-0 inline-block px-2.5 py-[3px] rounded-full text-[11px] font-semibold tracking-[0.3px] ${STATUS_CLASS[task.status] || ''}`}>
             {task.status}
@@ -34,7 +34,7 @@ const TaskCard = ({ task, showClaimButton = false, onClaimed }) => {
 
       
       {task.description && (
-        <p className="text-[13px] text-text-muted leading-relaxed">{task.description}</p>
+        <p className="text-[13px] text-text-muted leading-relaxed truncate">{task.description}</p>
       )}
 
       {/* Meta row */}
