@@ -25,7 +25,9 @@ const ConfirmDialog = ({
         </div>
 
         <div className="p-6">
-          <p className="text-[14px] leading-relaxed text-text-muted">{message}</p>
+          <p className="text-[14px] leading-relaxed text-text-muted [overflow-wrap:anywhere]">
+            {message}
+          </p>
 
           <div className="flex gap-3 pt-5 mt-5 border-t border-border">
             <button
